@@ -87,6 +87,8 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
   // publish the voxel grid to visualize
   nh.param("publish_voxel_map", _publish_voxels, false);
   // size of each voxel in meters
+  nh.param("min_tracked_height", _min_tracked_height, 0.0);
+  nh.param("max_tracked_height", _max_tracked_height, 3.0);
   nh.param("voxel_size", _voxel_size, 0.05);
   // 1=takes highest in layers, 0=takes current layer
   nh.param("combination_method", _combination_method, 1);
@@ -131,7 +133,9 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
                                                         (double)default_value_, \
                                                         _decay_model, \
                                                         _voxel_decay, \
-                                                        _publish_voxels);
+                                                        _publish_voxels, \
+                                                        _min_tracked_height, \
+                                                        _max_tracked_height);
   matchSize();
   current_ = true;
   ROS_INFO("%s created underlying voxel grid.", getName().c_str());
@@ -144,8 +148,8 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     ros::NodeHandle source_node(nh, source);
 
     // get the parameters for the specific topic
-    double observation_keep_time, expected_update_rate, min_obstacle_height;
-    double max_obstacle_height, min_z, max_z, vFOV, vFOVPadding;
+    double observation_keep_time, expected_update_rate, min_obs_height;
+    double max_obs_height, min_z, max_z, vFOV, vFOVPadding;
     double hFOV, decay_acceleration;
     std::string topic, sensor_frame, data_type, filter_str;
     bool inf_is_valid, clearing, marking, clear_after_reading, enabled;
@@ -157,8 +161,8 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     source_node.param("observation_persistence", observation_keep_time, 0.0);
     source_node.param("expected_update_rate", expected_update_rate, 0.0);
     source_node.param("data_type", data_type, std::string("PointCloud2"));
-    source_node.param("min_obstacle_height", min_obstacle_height, 0.0);
-    source_node.param("max_obstacle_height", max_obstacle_height, 3.0);
+    source_node.param("min_observation_height", min_obs_height, 0.0);
+    source_node.param("max_observation_height", max_obs_height, 3.0);
     source_node.param("inf_is_valid", inf_is_valid, false);
     source_node.param("clearing", clearing, false);
     source_node.param("marking", marking, true);
@@ -225,7 +229,7 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     _observation_buffers.push_back(
         boost::shared_ptr <buffer::MeasurementBuffer>
         (new buffer::MeasurementBuffer(topic, observation_keep_time,      \
-        expected_update_rate, min_obstacle_height, max_obstacle_height,   \
+        expected_update_rate, min_obs_height, max_obs_height,   \
         obstacle_range, *tf_, _global_frame, sensor_frame,                \
         transform_tolerance, min_z, max_z, vFOV, vFOVPadding, hFOV,       \
         decay_acceleration, marking, clearing, _voxel_size,               \
@@ -613,6 +617,8 @@ void SpatioTemporalVoxelLayer::DynamicReconfigureCallback( \
   _update_footprint_enabled = config.update_footprint_enabled;
   _mapping_mode = config.mapping_mode;
   _map_save_duration = ros::Duration(config.map_save_duration);
+  _min_tracked_height = config.min_tracked_height;
+  _max_tracked_height = config.max_tracked_height;
 
   if (level >=1) //update grid
   {
@@ -627,7 +633,10 @@ void SpatioTemporalVoxelLayer::DynamicReconfigureCallback( \
     delete _voxel_grid;
     _voxel_grid = new volume_grid::SpatioTemporalVoxelGrid(_voxel_size, \
       static_cast<double>(default_value_), _decay_model, \
-      _voxel_decay, _publish_voxels);
+      _voxel_decay, _publish_voxels, _min_tracked_height, _max_tracked_height);
+  }
+  else{
+    _voxel_grid->setTrackedHeightRange(_min_tracked_height, _max_tracked_height);
   }
 }
 
@@ -770,7 +779,7 @@ void SpatioTemporalVoxelLayer::updateBounds( \
   UpdateROSCostmap(min_x, min_y, max_x, max_y, cleared_cells);
 
   // publish point cloud in navigation mode
-  if (_publish_voxels && !_mapping_mode)
+  if (_publish_voxels)// && !_mapping_mode)
   {
     sensor_msgs::PointCloud2::Ptr pc2(new sensor_msgs::PointCloud2());
     _voxel_grid->GetOccupancyPointCloud(pc2);

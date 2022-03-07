@@ -126,7 +126,8 @@ public:
 
   SpatioTemporalVoxelGrid(const float& voxel_size, const double& background_value,
                           const int& decay_model, const double& voxel_decay,
-                          const bool& pub_voxels);
+                          const bool& pub_voxels,
+                          const double& min_h, const double& max_h);
   ~SpatioTemporalVoxelGrid(void);
 
   // Core making and clearing functions
@@ -145,6 +146,10 @@ public:
   // Save the file to file with size information
   bool SaveGrid(const std::string& file_name, double& map_size_bytes);
 
+  void setTrackedHeightRange(const double& min_h, const double& max_h){
+    _min_tracked_height = std::min(min_h, max_h);
+    _max_tracked_height = std::max(min_h, max_h);
+  };
 protected:
   // Initialize grid metadata and library
   void InitializeGrid(void);
@@ -162,9 +167,10 @@ protected:
                                 const double& acceleration_factor);
   void TemporalClearAndGenerateCostmap(std::vector<frustum_model>& frustums, \
                                        std::unordered_set<occupany_cell>& cleared_cells);
+  //void PubVoxels(void);
 
   // Populate the costmap ROS api and pointcloud with a marked point
-  void PopulateCostmapAndPointcloud(const openvdb::Coord& pt);
+  //void PopulateCostmapAndPointcloud(const openvdb::Coord& pt);
 
   // Utilities for tranformation
   openvdb::Vec3d WorldToIndex(const openvdb::Vec3d& coord) const;
@@ -173,8 +179,9 @@ protected:
   mutable openvdb::DoubleGrid::Ptr _grid;
   int                             _decay_model;
   double                          _background_value, _voxel_size, _voxel_decay;
+  double                          _min_tracked_height, _max_tracked_height;
   bool                            _pub_voxels;
-  std::vector<geometry_msgs::Point32>*   _grid_points;
+  //std::vector<geometry_msgs::Point32>*   _grid_points;
   std::unordered_map<occupany_cell, uint>* _cost_map;
   boost::mutex                            _grid_lock;
 };

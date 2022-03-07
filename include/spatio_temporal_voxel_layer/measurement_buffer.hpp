@@ -85,8 +85,8 @@ public:
   MeasurementBuffer(const std::string& topic_name,          \
                     const double& observation_keep_time,    \
                     const double& expected_update_rate,     \
-                    const double& min_obstacle_height,      \
-                    const double& max_obstacle_height,      \
+                    const double& min_observation_height,   \
+                    const double& max_observation_height,   \
                     const double& obstacle_range,           \
                     tf2_ros::Buffer& tf,                    \
                     const std::string& global_frame,        \
@@ -139,7 +139,7 @@ private:
   ros::Time _last_updated;
   std::string _global_frame, _topic_name, _sensor_frame;
   std::list<observation::MeasurementReading> _observation_list;
-  double _min_obstacle_height, _max_obstacle_height, _obstacle_range, _tf_tolerance;
+  double _min_observation_height, _max_observation_height, _obstacle_range, _tf_tolerance;
   double _min_z, _max_z, _vertical_fov, _vertical_fov_padding, _horizontal_fov;
   double  _decay_acceleration, _voxel_size;
   bool _marking, _clearing, _clear_buffer_after_reading, _enabled;

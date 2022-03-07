@@ -135,6 +135,8 @@ target_link_libraries(${PROJECT_NAME}
 #  ${TBB_LIBRARIES}
 #  ${catkin_LIBRARIES}
 #)
+add_executable(vdb2pcdConverter src/vdb2pcd.cpp)
+target_link_libraries(vdb2pcdConverter ${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenVDB_LIBRARIES} ${PCL_LIBRARIES})
 
 install(TARGETS ${PROJECT_NAME} #minimal_test
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

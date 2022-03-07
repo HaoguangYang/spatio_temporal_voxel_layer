@@ -43,14 +43,15 @@ namespace volume_grid
 /*****************************************************************************/
 SpatioTemporalVoxelGrid::SpatioTemporalVoxelGrid(const float& voxel_size, \
                    const double& background_value, const int& decay_model,\
-                   const double& voxel_decay, const bool& pub_voxels) :
+                   const double& voxel_decay, const bool& pub_voxels, \
+                   const double& min_h, const double& max_h) :
                    _background_value(background_value),                   \
                    _voxel_size(voxel_size),                               \
                    _decay_model(decay_model),                             \
                    _voxel_decay(voxel_decay),                             \
                    _pub_voxels(pub_voxels),                               \
-                   _grid_points(new std::vector<geometry_msgs::Point32>),   \
-                   _cost_map(new std::unordered_map<occupany_cell, uint>)
+                   _cost_map(new std::unordered_map<occupany_cell, uint>), \
+                   _min_tracked_height(min_h), _max_tracked_height(max_h)
 /*****************************************************************************/
 {
   this->InitializeGrid();
@@ -64,11 +65,6 @@ SpatioTemporalVoxelGrid::~SpatioTemporalVoxelGrid(void)
   if (_cost_map)
   {
     delete _cost_map;    
-  }
-
-  if (_grid_points)
-  {
-    delete _grid_points;
   }
 }
 
@@ -111,7 +107,6 @@ void SpatioTemporalVoxelGrid::ClearFrustums( \
     return;
   }
 
-  _grid_points->clear();
   _cost_map->clear();
 
   std::vector<frustum_model> obs_frustums;
@@ -157,7 +152,11 @@ void SpatioTemporalVoxelGrid::ClearFrustums( \
     frustum->TransformModel();
     obs_frustums.emplace_back(frustum, it->_decay_acceleration);
   }
+  
   TemporalClearAndGenerateCostmap(obs_frustums, cleared_cells);
+  //if (_pub_voxels){
+  //  PubVoxels();
+  //}
   return;
 }
 
@@ -171,12 +170,18 @@ void SpatioTemporalVoxelGrid::TemporalClearAndGenerateCostmap(                \
   const double cur_time = ros::WallTime::now().toSec();
 
   // check each point in the grid for inclusion in a frustum
+  //openvdb::DoubleGrid::ValueOnCIter cit_grid = _grid->cbeginValueOn();
   openvdb::DoubleGrid::ValueOnCIter cit_grid = _grid->cbeginValueOn();
   for (cit_grid; cit_grid.test(); ++cit_grid)
   {
     const openvdb::Coord pt_index(cit_grid.getCoord());
     const openvdb::Vec3d pose_world = this->IndexToWorld(pt_index);
-
+    if (pose_world[2]>_min_tracked_height)
+      continue;
+    else if (pose_world[2]<_max_tracked_height)
+      continue;
+    
+    // else
     std::vector<frustum_model>::iterator frustum_it = frustums.begin();
     bool frustum_cycle = false;
     bool cleared_point = false;
@@ -245,40 +250,38 @@ void SpatioTemporalVoxelGrid::TemporalClearAndGenerateCostmap(                \
     else
     {
       // if here, we can add to costmap and PC2
-      PopulateCostmapAndPointcloud(pt_index);
+      //PopulateCostmapAndPointcloud(pt_index);
+      std::unordered_map<occupany_cell, uint>::iterator cell;
+      cell = _cost_map->find(occupany_cell(pose_world[0], pose_world[1]));
+      if (cell != _cost_map->end())
+      {
+        cell->second += 1;
+      }
+      else
+      {
+        _cost_map->insert(std::make_pair( \
+                                  occupany_cell(pose_world[0], pose_world[1]), 1));
+      }
     }
   }
 }
 
-/*****************************************************************************/
-void SpatioTemporalVoxelGrid::PopulateCostmapAndPointcloud(const \
-                                                            openvdb::Coord& pt)
-/*****************************************************************************/
+/*****************************************************************************
+void SpatioTemporalVoxelGrid::PubVoxels(void)
 {
-  // add pt to the pointcloud and costmap
-  openvdb::Vec3d pose_world = _grid->indexToWorld(pt);
-
-  if (_pub_voxels)
-  {
+  openvdb::DoubleGrid::ValueOnCIter cit_grid = _grid->cbeginValueOn();
+  for (cit_grid; cit_grid.test(); ++cit_grid){
+    const openvdb::Coord pt_index(cit_grid.getCoord());
+    const openvdb::Vec3d pose_world = this->IndexToWorld(pt_index);
+  
     geometry_msgs::Point32 point;
     point.x = pose_world[0];
     point.y = pose_world[1];
     point.z = pose_world[2];
     _grid_points->push_back(point);
   }
-
-  std::unordered_map<occupany_cell, uint>::iterator cell;
-  cell = _cost_map->find(occupany_cell(pose_world[0], pose_world[1]));
-  if (cell != _cost_map->end())
-  {
-    cell->second += 1;
-  }
-  else
-  {
-    _cost_map->insert(std::make_pair( \
-                              occupany_cell(pose_world[0], pose_world[1]), 1));
-  }
 }
+*****************************************************************************/
 
 /*****************************************************************************/
 void SpatioTemporalVoxelGrid::Mark(const \
@@ -379,7 +382,7 @@ void SpatioTemporalVoxelGrid::GetOccupancyPointCloud( \
 /*****************************************************************************/
 {
   // convert the grid points stored in a PointCloud2
-  pc2->width  = _grid_points->size();
+  pc2->width  = _grid->activeVoxelCount();
   pc2->height = 1;
   pc2->is_dense = true;
 
@@ -395,13 +398,16 @@ void SpatioTemporalVoxelGrid::GetOccupancyPointCloud( \
   sensor_msgs::PointCloud2Iterator<float>iter_y(*pc2, "y");
   sensor_msgs::PointCloud2Iterator<float>iter_z(*pc2, "z");
 
-  for(std::vector<geometry_msgs::Point32>::iterator it = _grid_points->begin(); \
-      it != _grid_points->end(); ++it)
-  {
-    const geometry_msgs::Point32& pt = *it;
-    *iter_x = pt.x;
-    *iter_y = pt.y;
-    *iter_z = pt.z;
+  openvdb::DoubleGrid::ValueOnCIter cit_grid = _grid->cbeginValueOn();
+  for (cit_grid; cit_grid.test(); ++cit_grid){
+  //for(std::vector<geometry_msgs::Point32>::iterator it = _grid_points->begin(); \
+      it != _grid_points->end(); ++it) {
+    //const geometry_msgs::Point32& pt = *it;
+    const openvdb::Coord pt_index(cit_grid.getCoord());
+    const openvdb::Vec3d pose_world = this->IndexToWorld(pt_index);
+    *iter_x = pose_world[0];
+    *iter_y = pose_world[1];
+    *iter_z = pose_world[2];
     ++iter_x; ++iter_y; ++iter_z;
   }
 

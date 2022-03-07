@@ -157,6 +157,7 @@ private:
   dynamicReconfigureServerType*                                    _dynamic_reconfigure_server;
 
   bool                                 _publish_voxels, _mapping_mode;
+  double                               _min_tracked_height, _max_tracked_height;
   ros::Publisher                       _voxel_pub;
   ros::ServiceServer                   _grid_saver;
   ros::Duration                        _map_save_duration;
