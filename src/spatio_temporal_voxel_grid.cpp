@@ -176,9 +176,9 @@ void SpatioTemporalVoxelGrid::TemporalClearAndGenerateCostmap(                \
   {
     const openvdb::Coord pt_index(cit_grid.getCoord());
     const openvdb::Vec3d pose_world = this->IndexToWorld(pt_index);
-    if (pose_world[2]>_min_tracked_height)
+    if (pose_world[2]>_max_tracked_height)
       continue;
-    else if (pose_world[2]<_max_tracked_height)
+    else if (pose_world[2]<_min_tracked_height)
       continue;
     
     // else

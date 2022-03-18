@@ -55,6 +55,7 @@
 #include <vector>
 // msgs
 #include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
@@ -147,8 +148,8 @@ public:
   bool SaveGrid(const std::string& file_name, double& map_size_bytes);
 
   void setTrackedHeightRange(const double& min_h, const double& max_h){
-    _min_tracked_height = std::min(min_h, max_h);
-    _max_tracked_height = std::max(min_h, max_h);
+    _min_tracked_height = std::fmin(min_h, max_h);
+    _max_tracked_height = std::fmax(min_h, max_h);
   };
 protected:
   // Initialize grid metadata and library
