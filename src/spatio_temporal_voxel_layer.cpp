@@ -112,7 +112,11 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
   if (_mapping_mode)
   {
     _map_save_duration = ros::Duration(map_save_time);
-    _last_map_save_time = ros::Time::now() - _map_save_duration;
+    ros::Time now = ros::Time::now();
+    if (now.toSec() > _map_save_duration.toSec())
+      _last_map_save_time = now - _map_save_duration;
+    else
+      _last_map_save_time = ros::Time(0);
   }
 
   if (track_unknown_space)

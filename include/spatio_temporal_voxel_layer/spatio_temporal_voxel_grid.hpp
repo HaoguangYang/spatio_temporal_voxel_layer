@@ -60,7 +60,7 @@
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
 // TBB
-#include <tbb/parallel_do.h>
+#include <tbb/parallel_for_each.h>
 // OpenVDB
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridTransformer.h>
